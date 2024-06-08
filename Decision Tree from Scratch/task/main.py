@@ -2,11 +2,29 @@ import numpy as np
 import pandas as pd
 
 
-def gini(d: np.ndarray) -> float:
+class Node:
+    def __init__(self):
+        self.left = None
+        self.right = None
+        self.term = False
+        self.label = None
+        self.feature = None
+        self.value = None
+
+    def set_split(self, feature, value) -> None:
+        self.feature = feature
+        self.value = value
+
+    def set_term(self, label) -> None:
+        self.term = True
+        self.label = label
+
+
+def gini(d: np.ndarray | pd.Series) -> float:
     return 1 - sum((np.bincount(d) / len(d)) ** 2)
 
 
-def weighted_gini(d1: np.ndarray, d2: np.ndarray) -> float:
+def weighted_gini(d1: np.ndarray | pd.Series, d2: np.ndarray | pd.Series) -> float:
     return round((len(d1) * gini(d1) + len(d2) * gini(d2)) / (len(d1) + len(d2)), 5)
 
 
@@ -21,10 +39,24 @@ def split(x: pd.DataFrame, y: pd.Series) -> tuple:
     return result
 
 
+def recursive_split(node: Node, x: pd.DataFrame, y: pd.Series, min_samples=1) -> None:
+    if (x.shape[0] <= min_samples) or (x.value_counts().shape[0] == 1) or (gini(y) == 0):
+        node.set_term(y.mode()[0])
+        return
+    _, feat, val, left_ind, right_ind = split(x, y)
+    node.set_split(feat, val)
+    print(f'Made split: {node.feature} is {node.value}')
+    node.left, node.right = Node(), Node()
+    recursive_split(node.left, x.iloc[left_ind].reset_index(drop=True), y.iloc[left_ind].reset_index(drop=True))
+    recursive_split(node.right, x.iloc[right_ind].reset_index(drop=True), y.iloc[right_ind].reset_index(drop=True))
+
+
 def main():
     df = pd.read_csv(input(), index_col=0)
     data, target = df.drop(columns='Survived'), df['Survived']
-    print(*split(data, target))
+
+    root = Node()
+    recursive_split(root, data, target)
 
 
 if __name__ == '__main__':
