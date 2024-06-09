@@ -20,43 +20,51 @@ class Node:
         self.label = label
 
 
-def gini(d: np.ndarray | pd.Series) -> float:
-    return 1 - sum((np.bincount(d) / len(d)) ** 2)
+class DecisionTree:
+    def __init__(self, min_samples=1):
+        self.root = Node()
+        self.min_samples = min_samples
 
+    def fit(self, x: pd.DataFrame, y: pd.Series) -> None:
+        self._recursive_split(self.root, x, y)
 
-def weighted_gini(d1: np.ndarray | pd.Series, d2: np.ndarray | pd.Series) -> float:
-    return round((len(d1) * gini(d1) + len(d2) * gini(d2)) / (len(d1) + len(d2)), 5)
+    @staticmethod
+    def _gini(d: np.ndarray | pd.Series) -> float:
+        return 1 - sum((np.bincount(d) / len(d)) ** 2)
 
+    def _weighted_gini(self, d1: np.ndarray | pd.Series, d2: np.ndarray | pd.Series) -> float:
+        return round((len(d1) * self._gini(d1) + len(d2) * self._gini(d2)) / (len(d1) + len(d2)), 5)
 
-def split(x: pd.DataFrame, y: pd.Series) -> tuple:
-    result = None
-    for feat in x.columns:
-        for val in x[feat].unique():
-            left, right = y[x[feat] == val], y[x[feat] != val]
-            gini_ind = weighted_gini(left, right)
-            if not result or gini_ind < result[0]:
-                result = (gini_ind, feat, val, left.index.tolist(), right.index.tolist())
-    return result
+    def _split(self, x: pd.DataFrame, y: pd.Series) -> tuple:
+        result = None
+        for feat in x.columns:
+            for val in x[feat].unique():
+                left, right = y[x[feat] == val], y[x[feat] != val]
+                gini_ind = self._weighted_gini(left, right)
+                if not result or gini_ind < result[0]:
+                    result = (gini_ind, feat, val, left.index.tolist(), right.index.tolist())
+        return result
 
-
-def recursive_split(node: Node, x: pd.DataFrame, y: pd.Series, min_samples=1) -> None:
-    if (x.shape[0] <= min_samples) or (x.value_counts().shape[0] == 1) or (gini(y) == 0):
-        node.set_term(y.mode()[0])
-        return
-    _, feat, val, left_ind, right_ind = split(x, y)
-    node.set_split(feat, val)
-    print(f'Made split: {node.feature} is {node.value}')
-    node.left, node.right = Node(), Node()
-    recursive_split(node.left, x.iloc[left_ind].reset_index(drop=True), y.iloc[left_ind].reset_index(drop=True))
-    recursive_split(node.right, x.iloc[right_ind].reset_index(drop=True), y.iloc[right_ind].reset_index(drop=True))
+    def _recursive_split(self, node: Node, x: pd.DataFrame, y: pd.Series) -> None:
+        if (x.shape[0] <= self.min_samples) or (x.value_counts().shape[0] == 1) or (self._gini(y) == 0):
+            node.set_term(y.mode()[0])
+            return
+        _, feat, val, left_ind, right_ind = self._split(x, y)
+        node.set_split(feat, val)
+        print(f'Made split: {node.feature} is {node.value}')
+        node.left, node.right = Node(), Node()
+        self._recursive_split(node.left, x.iloc[left_ind].reset_index(drop=True),
+                              y.iloc[left_ind].reset_index(drop=True))
+        self._recursive_split(node.right, x.iloc[right_ind].reset_index(drop=True),
+                              y.iloc[right_ind].reset_index(drop=True))
 
 
 def main():
     df = pd.read_csv(input(), index_col=0)
     data, target = df.drop(columns='Survived'), df['Survived']
 
-    root = Node()
-    recursive_split(root, data, target)
+    tree = DecisionTree()
+    tree.fit(data, target)
 
 
 if __name__ == '__main__':
