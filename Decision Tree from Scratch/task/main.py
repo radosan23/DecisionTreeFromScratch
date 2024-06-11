@@ -28,6 +28,14 @@ class DecisionTree:
     def fit(self, x: pd.DataFrame, y: pd.Series) -> None:
         self._recursive_split(self.root, x, y)
 
+    def predict(self, x: pd.DataFrame) -> np.ndarray:
+        # return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()    - alternative version
+        predictions = np.zeros(x.shape[0])
+        for i, row in x.iterrows():
+            print(f'Prediction for sample # {i}')
+            predictions[i] = self._recursive_predict(row, self.root)
+        return predictions
+
     @staticmethod
     def _gini(d: np.ndarray | pd.Series) -> float:
         return 1 - sum((np.bincount(d) / len(d)) ** 2)
@@ -51,20 +59,28 @@ class DecisionTree:
             return
         _, feat, val, left_ind, right_ind = self._split(x, y)
         node.set_split(feat, val)
-        print(f'Made split: {node.feature} is {node.value}')
         node.left, node.right = Node(), Node()
         self._recursive_split(node.left, x.iloc[left_ind].reset_index(drop=True),
                               y.iloc[left_ind].reset_index(drop=True))
         self._recursive_split(node.right, x.iloc[right_ind].reset_index(drop=True),
                               y.iloc[right_ind].reset_index(drop=True))
 
+    def _recursive_predict(self, sample: pd.Series, node: Node) -> int:
+        if node.term:
+            print(f'\tPredicted label: {node.label}')
+            return node.label
+        print(f'\tConsidering decision rule on feature {node.feature} with value {node.value}')
+        next_node = node.left if sample[node.feature] == node.value else node.right
+        return self._recursive_predict(sample, next_node)
+
 
 def main():
-    df = pd.read_csv(input(), index_col=0)
-    data, target = df.drop(columns='Survived'), df['Survived']
+    df_train, x_test = (pd.read_csv(x, index_col=0) for x in input().split())
+    x_train, y_train = df_train.drop(columns='Survived'), df_train['Survived']
 
     tree = DecisionTree()
-    tree.fit(data, target)
+    tree.fit(x_train, y_train)
+    tree.predict(x_test)
 
 
 if __name__ == '__main__':
