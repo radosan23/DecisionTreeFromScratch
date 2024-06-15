@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix
 
 
 class Node:
@@ -29,12 +30,7 @@ class DecisionTree:
         self._recursive_split(self.root, x, y)
 
     def predict(self, x: pd.DataFrame) -> np.ndarray:
-        # return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()    - alternative version
-        predictions = np.zeros(x.shape[0])
-        for i, row in x.iterrows():
-            print(f'Prediction for sample # {i}')
-            predictions[i] = self._recursive_predict(row, self.root)
-        return predictions
+        return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()
 
     @staticmethod
     def _gini(d: np.ndarray | pd.Series) -> float:
@@ -67,20 +63,21 @@ class DecisionTree:
 
     def _recursive_predict(self, sample: pd.Series, node: Node) -> int:
         if node.term:
-            print(f'\tPredicted label: {node.label}')
             return node.label
-        print(f'\tConsidering decision rule on feature {node.feature} with value {node.value}')
         next_node = node.left if sample[node.feature] == node.value else node.right
         return self._recursive_predict(sample, next_node)
 
 
 def main():
-    df_train, x_test = (pd.read_csv(x, index_col=0) for x in input().split())
+    df_train, df_test = (pd.read_csv(x, index_col=0) for x in input().split())
     x_train, y_train = df_train.drop(columns='Survived'), df_train['Survived']
+    x_test, y_test = df_test.drop(columns='Survived'), df_test['Survived']
 
-    tree = DecisionTree()
+    tree = DecisionTree(min_samples=74)
     tree.fit(x_train, y_train)
-    tree.predict(x_test)
+    predictions = tree.predict(x_test)
+    conf_matrix = confusion_matrix(y_test, predictions, normalize='true')
+    print(f'{conf_matrix[1, 1]:.3f} {conf_matrix[0, 0]:.3f}')
 
 
 if __name__ == '__main__':
