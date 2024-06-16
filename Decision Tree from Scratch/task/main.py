@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import confusion_matrix
 
 
 class Node:
@@ -43,7 +42,10 @@ class DecisionTree:
         result = None
         for feat in x.columns:
             for val in x[feat].unique():
-                left, right = y[x[feat] == val], y[x[feat] != val]
+                if x[feat].dtype == float:
+                    left, right = y[x[feat] <= val], y[x[feat] > val]
+                else:
+                    left, right = y[x[feat] == val], y[x[feat] != val]
                 gini_ind = self._weighted_gini(left, right)
                 if not result or gini_ind < result[0]:
                     result = (gini_ind, feat, val, left.index.tolist(), right.index.tolist())
@@ -69,15 +71,11 @@ class DecisionTree:
 
 
 def main():
-    df_train, df_test = (pd.read_csv(x, index_col=0) for x in input().split())
-    x_train, y_train = df_train.drop(columns='Survived'), df_train['Survived']
-    x_test, y_test = df_test.drop(columns='Survived'), df_test['Survived']
+    df = pd.read_csv(input(), index_col=0)
+    x_train, y_train = df.drop(columns='Survived'), df['Survived']
 
     tree = DecisionTree(min_samples=74)
-    tree.fit(x_train, y_train)
-    predictions = tree.predict(x_test)
-    conf_matrix = confusion_matrix(y_test, predictions, normalize='true')
-    print(f'{conf_matrix[1, 1]:.3f} {conf_matrix[0, 0]:.3f}')
+    print(*[x.round(3) if type(x) is float else x for x in tree._split(x_train, y_train)])
 
 
 if __name__ == '__main__':
