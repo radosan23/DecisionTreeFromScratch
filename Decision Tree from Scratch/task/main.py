@@ -21,15 +21,21 @@ class Node:
 
 
 class DecisionTree:
-    def __init__(self, min_samples=1):
+    def __init__(self, min_samples=1, numerical=()):
         self.root = Node()
         self.min_samples = min_samples
+        self.numerical = numerical
 
     def fit(self, x: pd.DataFrame, y: pd.Series) -> None:
         self._recursive_split(self.root, x, y)
 
     def predict(self, x: pd.DataFrame) -> np.ndarray:
-        return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()
+        # return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()    -alternative version
+        prediction = np.zeros(x.shape[0])
+        for i, row in x.iterrows():
+            print(f'Prediction for sample # {i}')
+            prediction[i] = self._recursive_predict(row, self.root)
+        return prediction
 
     @staticmethod
     def _gini(d: np.ndarray | pd.Series) -> float:
@@ -42,7 +48,7 @@ class DecisionTree:
         result = None
         for feat in x.columns:
             for val in x[feat].unique():
-                if x[feat].dtype == float:
+                if feat in self.numerical:
                     left, right = y[x[feat] <= val], y[x[feat] > val]
                 else:
                     left, right = y[x[feat] == val], y[x[feat] != val]
@@ -56,6 +62,7 @@ class DecisionTree:
             node.set_term(y.mode()[0])
             return
         _, feat, val, left_ind, right_ind = self._split(x, y)
+        print(f'Made split: {feat} is {val}')
         node.set_split(feat, val)
         node.left, node.right = Node(), Node()
         self._recursive_split(node.left, x.iloc[left_ind].reset_index(drop=True),
@@ -65,17 +72,23 @@ class DecisionTree:
 
     def _recursive_predict(self, sample: pd.Series, node: Node) -> int:
         if node.term:
+            print(f'\tPredicted label: {node.label}')
             return node.label
-        next_node = node.left if sample[node.feature] == node.value else node.right
+        if node.feature in self.numerical:
+            next_node = node.left if sample[node.feature] <= node.value else node.right
+        else:
+            next_node = node.left if sample[node.feature] == node.value else node.right
+        print(f'\tConsidering decision rule on feature {node.feature} with value {node.value}')
         return self._recursive_predict(sample, next_node)
 
 
 def main():
-    df = pd.read_csv(input(), index_col=0)
-    x_train, y_train = df.drop(columns='Survived'), df['Survived']
+    df_train, df_test = (pd.read_csv(x, index_col=0) for x in input().split())
+    x_train, y_train = df_train.drop(columns='Survived'), df_train['Survived']
 
-    tree = DecisionTree(min_samples=74)
-    print(*[x.round(3) if type(x) is float else x for x in tree._split(x_train, y_train)])
+    tree = DecisionTree(min_samples=1, numerical=('Age', 'Fare'))
+    tree.fit(x_train, y_train)
+    tree.predict(df_test)
 
 
 if __name__ == '__main__':
