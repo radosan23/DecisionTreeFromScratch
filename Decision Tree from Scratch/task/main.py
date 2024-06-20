@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix
 
 
 class Node:
@@ -30,12 +31,7 @@ class DecisionTree:
         self._recursive_split(self.root, x, y)
 
     def predict(self, x: pd.DataFrame) -> np.ndarray:
-        # return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()    -alternative version
-        prediction = np.zeros(x.shape[0])
-        for i, row in x.iterrows():
-            print(f'Prediction for sample # {i}')
-            prediction[i] = self._recursive_predict(row, self.root)
-        return prediction
+        return x.apply(self._recursive_predict, args=(self.root, ), axis=1).to_numpy()
 
     @staticmethod
     def _gini(d: np.ndarray | pd.Series) -> float:
@@ -62,7 +58,6 @@ class DecisionTree:
             node.set_term(y.mode()[0])
             return
         _, feat, val, left_ind, right_ind = self._split(x, y)
-        print(f'Made split: {feat} is {val}')
         node.set_split(feat, val)
         node.left, node.right = Node(), Node()
         self._recursive_split(node.left, x.iloc[left_ind].reset_index(drop=True),
@@ -72,23 +67,24 @@ class DecisionTree:
 
     def _recursive_predict(self, sample: pd.Series, node: Node) -> int:
         if node.term:
-            print(f'\tPredicted label: {node.label}')
             return node.label
         if node.feature in self.numerical:
             next_node = node.left if sample[node.feature] <= node.value else node.right
         else:
             next_node = node.left if sample[node.feature] == node.value else node.right
-        print(f'\tConsidering decision rule on feature {node.feature} with value {node.value}')
         return self._recursive_predict(sample, next_node)
 
 
 def main():
     df_train, df_test = (pd.read_csv(x, index_col=0) for x in input().split())
     x_train, y_train = df_train.drop(columns='Survived'), df_train['Survived']
+    x_test, y_test = df_test.drop(columns='Survived'), df_test['Survived']
 
-    tree = DecisionTree(min_samples=1, numerical=('Age', 'Fare'))
+    tree = DecisionTree(min_samples=74, numerical=('Age', 'Fare'))
     tree.fit(x_train, y_train)
-    tree.predict(df_test)
+    prediction = tree.predict(x_test)
+    conf_matrix = confusion_matrix(y_test, prediction, normalize='true')
+    print(conf_matrix[1, 1].round(3), conf_matrix[0, 0].round(3))
 
 
 if __name__ == '__main__':
